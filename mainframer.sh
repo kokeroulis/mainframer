@@ -15,6 +15,7 @@ PROJECT_DIR_NAME="$( basename "$PROJECT_DIR")"
 REMOTE_BUILD_MACHINE=$(awk -F "=" '/remote_build.machine/ {print $2}' "$PROJECT_DIR/local.properties")
 LOCAL_GZIP_LEVEL=$(awk -F "=" '/remote_build.local_gzip_level/ {print $2}' "$PROJECT_DIR/local.properties")
 REMOTE_GZIP_LEVEL=$(awk -F "=" '/remote_build.remote_gzip_level/ {print $2}' "$PROJECT_DIR/local.properties")
+REMOTE_SSH_PORT=$(awk -F "=" '/remote_build.ssh_port/ {print $2}' "$PROJECT_DIR/local.properties")
 
 if [ -z "$LOCAL_GZIP_LEVEL" ]; then
 	LOCAL_GZIP_LEVEL=1
@@ -22,6 +23,10 @@ fi
 
 if [ -z "$REMOTE_GZIP_LEVEL" ]; then
 	REMOTE_GZIP_LEVEL=1
+fi
+
+if [ -z "$REMOTE_SSH_PORT" ]; then
+	REMOTE_SSH_PORT=22
 fi
 
 if [ -z "$REMOTE_BUILD_MACHINE" ]; then
@@ -89,11 +94,12 @@ else
 fi
 
 # Transfer archive to remote machine.
-scp "$PROJECT_DIR/build/project_for_remote_build.tar" $REMOTE_BUILD_MACHINE:~/
+scp -P "$REMOTE_SSH_PORT" "$PROJECT_DIR/build/project_for_remote_build.tar" $REMOTE_BUILD_MACHINE:~/
 
 # Build project on a remote machine and then archive it.
-ssh $REMOTE_BUILD_MACHINE \
+ssh $REMOTE_BUILD_MACHINE -p "$REMOTE_SSH_PORT" \
 "set -xe && \
+export ANDROID_HOME=/home/kokeroulis/Android/Sdk \
 export REMOTE_ARCHIVER=\`eval \"$DETECT_ARCHIVER\"\` && \
 cd ~ && \
 mkdir -p $PROJECT_DIR_NAME && \
@@ -108,7 +114,7 @@ rm -rf "$PROJECT_DIR"/build "$PROJECT_DIR"/*/build
 mkdir -p "$PROJECT_DIR/build/"
 
 # Copy build results from remote machine to local.
-scp "$REMOTE_BUILD_MACHINE":~/"$PROJECT_DIR_NAME"/remotely_built_project.tar "$PROJECT_DIR/build/"
+scp -P "$REMOTE_SSH_PORT" "$REMOTE_BUILD_MACHINE":~/"$PROJECT_DIR_NAME"/remotely_built_project.tar "$PROJECT_DIR/build/"
 
 # Unarchive build results.
 pushd "$PROJECT_DIR"
